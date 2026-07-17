@@ -60,14 +60,10 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      # NOT: Tek satır — Windows runner'da varsayılan shell pwsh'dir ve
+      # "\" satır devamı pwsh'de geçersizdir (bash-only). Shell bağımsız olmalı.
       - name: Publish (${{ matrix.rid }})
-        run: |
-          dotnet publish GodotMcpServer.csproj -c Release \
-            -r ${{ matrix.rid }} --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:IncludeNativeLibrariesForSelfExtract=true \
-            -p:EnableCompressionInSingleFile=true \
-            -o out/${{ matrix.rid }}
+        run: dotnet publish GodotMcpServer.csproj -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o out/${{ matrix.rid }}
 
       # Windows: Compress-Archive — diğerleri: zip
       - name: Paketle (Windows)
