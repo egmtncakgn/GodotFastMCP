@@ -11,14 +11,17 @@ func _init(ei: EditorInterface, lc: LogCollector) -> void:
 	_lc = lc
 
 func register() -> void:
-	var scene_cmd = preload("res://addons/godot_mcp/commands/cmd_scene.gd").new(_ei)
-	var node_cmd  = preload("res://addons/godot_mcp/commands/cmd_node.gd").new(_ei)
-	var script_cmd = preload("res://addons/godot_mcp/commands/cmd_script.gd").new(_ei)
-	var editor_cmd = preload("res://addons/godot_mcp/commands/cmd_editor.gd").new(_ei)
-	var fs_cmd = preload("res://addons/godot_mcp/commands/cmd_filesystem.gd").new(_ei)
-	var res_cmd = preload("res://addons/godot_mcp/commands/cmd_resource.gd").new(_ei)
-	var screenshot_cmd = preload("res://addons/godot_mcp/commands/cmd_screenshot.gd").new(_ei)
-	var update_cmd = preload("res://addons/godot_mcp/commands/cmd_update.gd").new(_ei)
+	# preload yerine load() kullan: editor reload sirasinda preload cache'i
+	# bazen res:// script'lerini bulamayip null dondurebiliyor.
+	var base := "res://addons/godot_mcp/commands/"
+	var scene_cmd = load(base + "cmd_scene.gd").new(_ei)
+	var node_cmd  = load(base + "cmd_node.gd").new(_ei)
+	var script_cmd = load(base + "cmd_script.gd").new(_ei)
+	var editor_cmd = load(base + "cmd_editor.gd").new(_ei)
+	var fs_cmd = load(base + "cmd_filesystem.gd").new(_ei)
+	var res_cmd = load(base + "cmd_resource.gd").new(_ei)
+	var screenshot_cmd = load(base + "cmd_screenshot.gd").new(_ei)
+	var update_cmd = load(base + "cmd_update.gd").new(_ei)
 	
 	_handlers["scene_open"]         = scene_cmd.open_scene
 	_handlers["scene_save"]         = scene_cmd.save_scene
@@ -77,7 +80,7 @@ func register() -> void:
 
 	# Sağlık kontrolü ve meta
 	_handlers["ping"]          = func(p): return {"success": true, "result": {"pong": true, "time": Time.get_unix_time_from_system()}}
-	_handlers["get_version"]   = func(p): return {"success": true, "result": {"godot_version": Engine.get_version_info(), "plugin_version": "1.1.0"}}
+	_handlers["get_version"]   = func(p): return {"success": true, "result": {"godot_version": Engine.get_version_info(), "plugin_version": _get_plugin_version()}}
 
 	# Addon güncelleme
 	_handlers["update_addon"]        = update_cmd.update_addon
@@ -86,7 +89,15 @@ func register() -> void:
 func dispatch(command: String, params: Dictionary) -> Dictionary:
 	if not _handlers.has(command):
 		return {"success": false, "error": "Bilinmeyen komut: " + command}
-	
+
 	var handler = _handlers[command]
 	var result = await handler.call(params)
 	return result
+
+# Plugin versiyonunu tek kaynaktan (plugin.cfg) okur.
+# Server tarafı auto-update karşılaştırması için kullanır.
+func _get_plugin_version() -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://addons/godot_mcp/plugin.cfg") == OK:
+		return str(cfg.get_value("plugin", "version", "unknown"))
+	return "unknown"

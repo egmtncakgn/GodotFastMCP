@@ -10,12 +10,8 @@ func _enter_tree() -> void:
 	
 	mcp_server = McpServer.new(get_editor_interface(), log_collector)
 	add_child(mcp_server)
-
-	# Port: env değişkeni > varsayılan 6505. Çakışmada plugin 6506/6507'ye düşer.
-	var port = 6505
-	if OS.has_environment("GODOT_MCP_PORT"):
-		port = int(OS.get_environment("GODOT_MCP_PORT"))
-	mcp_server.start(port)
+	# Parametresiz: dinamik port aralığı (46300-46400) + lock dosyası.
+	mcp_server.start()
 
 func _exit_tree() -> void:
 	if mcp_server:

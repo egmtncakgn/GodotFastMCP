@@ -1,0 +1,58 @@
+name: CI
+
+# Her push/PR'da build bütünlüğünü doğrular.
+# (Geçmişte kök dizine karışan yabancı .cs dosyaları build'i bozuyordu —
+#  explicit compile items ile çözüldü, bu workflow regresyonu yakalar.)
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build
+        run: dotnet build GodotMcpServer.csproj -c Release --nologo
+
+      - name: Publish smoke test (framework-dependent)
+        run: dotnet publish GodotMcpServer.csproj -c Release -o out --nologo
+
+      - name: Publish çıktısında addon gömülü mü?
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "out/addons/godot_mcp/plugin.cfg")) {
+            Write-Error "addons/godot_mcp publish çıktısında yok! Auto-update kırılır."
+            exit 1
+          }
+          Write-Host "OK: addon publish çıktısında gömülü."
+
+      - name: Addon GDScript dosyaları tam mı?
+        shell: pwsh
+        run: |
+          $required = @(
+            "addons/godot_mcp/plugin.cfg",
+            "addons/godot_mcp/plugin.gd",
+            "addons/godot_mcp/mcp_server.gd",
+            "addons/godot_mcp/command_dispatcher.gd",
+            "addons/godot_mcp/log_collector.gd",
+            "addons/godot_mcp/commands/cmd_scene.gd",
+            "addons/godot_mcp/commands/cmd_node.gd",
+            "addons/godot_mcp/commands/cmd_script.gd",
+            "addons/godot_mcp/commands/cmd_editor.gd",
+            "addons/godot_mcp/commands/cmd_filesystem.gd",
+            "addons/godot_mcp/commands/cmd_resource.gd",
+            "addons/godot_mcp/commands/cmd_screenshot.gd",
+            "addons/godot_mcp/commands/cmd_update.gd"
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) { Write-Error "Eksik addon dosyası: $f"; exit 1 }
+          }
+          Write-Host "OK: tüm addon dosyaları mevcut."

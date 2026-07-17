@@ -1,0 +1,107 @@
+name: Release
+
+# Tag push'landığında (v*.*.*) 4 platform için self-contained, tek-dosya
+# paketler üretir ve GitHub Release oluşturur. Bu paketler:
+#   1) Son kullanıcıların indirdiği dağıtımlardır (.NET kurulu olması gerekmez)
+#   2) Server'ın self-update sisteminin (server_self_update) indirdiği paketlerdir
+# Asset adlandırması ServerUpdateManager ile birebir eşleşmelidir:
+#   GodotMcpServer-{win-x64,linux-x64,linux-arm64,osx-x64,osx-arm64}.zip
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Sürüm (örn. 1.2.0) — csproj ile eşleşmeli"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag ile csproj versiyonu eşleşmeli
+        shell: bash
+        run: |
+          CSPROJ_VERSION=$(grep -oPm1 '(?<=<Version>)[^<]+' GodotMcpServer.csproj)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="v${{ inputs.version }}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "csproj: $CSPROJ_VERSION | tag: $TAG_VERSION"
+          if [ "v$CSPROJ_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Versiyon uyumsuzluğu! csproj=$CSPROJ_VERSION tag=$TAG_VERSION"
+            exit 1
+          fi
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     os: windows-latest }
+          - { rid: linux-x64,   os: ubuntu-latest  }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }
+          - { rid: osx-x64,     os: macos-13       }
+          - { rid: osx-arm64,   os: macos-latest   }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish (${{ matrix.rid }})
+        run: |
+          dotnet publish GodotMcpServer.csproj -c Release \
+            -r ${{ matrix.rid }} --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true \
+            -o out/${{ matrix.rid }}
+
+      # Windows: Compress-Archive — diğerleri: zip
+      - name: Paketle (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "out/${{ matrix.rid }}/*" -DestinationPath "GodotMcpServer-${{ matrix.rid }}.zip"
+
+      - name: Paketle (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cd "out/${{ matrix.rid }}" && zip -r "../../GodotMcpServer-${{ matrix.rid }}.zip" . && cd ../..
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.rid }}
+          path: GodotMcpServer-${{ matrix.rid }}.zip
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pkg-*
+          merge-multiple: true
+
+      - name: Paketleri listele
+        run: ls -la *.zip
+
+      - name: GitHub Release oluştur
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
