@@ -1,0 +1,51 @@
+# ============================================================
+# GodotFastMCP — .gitignore
+# ============================================================
+
+# --- .NET / C# build output ---
+bin/
+obj/
+*.user
+
+# Kök seviyede duran publish edilmiş assembly'ler ve native runtime'lar
+*.dll
+*.exe
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+runtimes/
+
+# Publish edilmiş runtime (dağıtım artefaktı, kaynak değil)
+publish/
+
+# --- .NET genel ---
+*.userprefs
+*.suo
+*.user
+
+# --- Godot ---
+.godot/
+*.import
+.import/
+export.cfg
+export_presets.cfg
+
+# Godot otomatik ürettiği UID dosyaları (Godot 4.4+ kendi üretir)
+addons/**/*.uid
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# --- IDE ---
+.vs/
+.idea/
+*.csproj.user
+.vscode/settings.json
+
+# --- Logs ---
+*.log
+logs/
