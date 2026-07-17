@@ -5,7 +5,33 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>GodotMcpServer</AssemblyName>
+    <RootNamespace>GodotMcpServer</RootNamespace>
+
+    <!-- Tek versiyon kaynağı: ServerVersion.Current bu assembly versiyonunu okur.
+         Release workflow bu değeri tag ile doğrular. -->
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <InformationalVersion>1.2.0</InformationalVersion>
+    <Product>GodotFastMCP</Product>
+    <Description>MCP (Model Context Protocol) server bridging AI clients to the Godot 4 editor.</Description>
+    <RepositoryUrl>https://github.com/egmtncakgn/GodotFastMCP</RepositoryUrl>
+
+    <!-- KRİTİK: Default globbing KAPALI. Repo kökünde dolaşan yabancı .cs dosyaları
+         (örn. _wstest/, test scriptleri) derlemeye sızıp build'i bozamaz.
+         Sadece aşağıda açıkça listelenen dosyalar derlenir. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="GodotBridge.cs" />
+    <Compile Include="PortCoordinator.cs" />
+    <Compile Include="ServerVersion.cs" />
+    <Compile Include="Protocol\**\*.cs" />
+    <Compile Include="Tools\**\*.cs" />
+    <Compile Include="Update\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" Version="1.2.0" />
@@ -17,6 +43,6 @@
 
   <!-- Addon kaynağını publish output'una kopyala (update_addon_push için) -->
   <ItemGroup>
-    <None Include="addons\**\*" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="addons\**\*" Exclude="addons\**\*.uid" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,38 @@
 # Godot MCP Server — Progress Log
 
+## 🚀 18 Temmuz 2026 — v1.2.0: Ölçeklenebilirlik + Server Self-Update
+
+### Kritik Bug Düzeltmeleri
+| # | Sorun | Çözüm |
+|---|-------|-------|
+| 1 | **Build bozuktu** (CS8802/CS0579): kökteki `WsTestClient.cs` + `_wstest/Program.cs` default globbing ile derlemeye sızıyordu | csproj'da `EnableDefaultCompileItems=false` + explicit dosya listesi; test artıkları temizlendi |
+| 2 | **~225 build artifact'ı repo kökündeydi** (dll/exe/pdb publish dump'ı) | Temizlendi; .gitignore zaten kapsıyordu |
+| 3 | **Godot kapalıyken MCP istemcisi kilitleniyordu**: `await ConnectAsync()` host.RunAsync() öncesinde ~100 portu sırayla deniyordu → initialize yanıtı dakikalarca yok | Başlangıç bağlantısı arka plana alındı; TCP fast-probe eklendi (tarama 30sn → <1sn) |
+| 4 | **Addon auto-update son kullanıcıda kırıktı**: `BaseDirectory/../addons` sadece repo-içi publish'te çalışıyordu | Çok adaylı dizin çözümleme (publish gömülü `addons/` + yukarı tarama) |
+| 5 | Health-check/reconnect tool isteğinin CancellationToken'ına bağlıydı (istek iptal → reconnect ölüyordu) | `_shutdownCts.Token`'a bağlandı |
+| 6 | `ScheduleReconnect` fire-and-forget awaiter bug'ı | Doğru async Task.Run yapısı |
+| 7 | GDScript `cmd_update._copy_dir` count değerle geçtiği için recursive sayımı kaybediyordu | Dönüş değeriyle toplama |
+| 8 | `get_version` hardcoded "1.1.0" idi | plugin.cfg'den dinamik okuma (tek kaynak) |
+
+### Yeni Özellikler
+- **Server self-update sistemi** (`Update/ServerUpdateManager.cs`): GitHub Releases API kontrolü, platforma uygun zip indirme, staging, proses-dışı watcher script (Windows ps1 / Unix sh) ile kilitli dosyaları proses kapandıktan sonra değiştirme. Geliştirici ortamında otomatik devre dışı.
+- **3 yeni MCP tool** (toplam 52): `server_version`, `server_check_update`, `server_self_update`
+- **Versiyon-bazlı addon auto-update**: Her bağlantıda Godot'un plugin versiyonu sorulur; eşitse push atlanır (bant genişliği + log temizliği), farklıysa canlı güncellenir
+- **Tek versiyon kaynağı**: `ServerVersion.cs` (assembly'den) + plugin.cfg (addon için)
+- **GitHub Actions**: `ci.yml` (build + publish smoke + addon bütünlüğü), `release.yml` (tag → 5 platform self-contained single-file zip → GitHub Release; csproj↔tag versiyon doğrulaması)
+- **README.md**: Son kullanıcı kurulumu, MCP istemci konfigleri (opencode/Claude), güncelleme sistemi, geliştirici rehberi
+- `mcp_server.gd`: MAX_PEERS=16 sınırı gerçekten uygulanıyor (önceden sadece log mesajıydı)
+
+### Doğrulama
+```
+✅ Build: 0 hata 0 kod uyarısı
+✅ Publish: publish/ altında addons/ gömülü
+✅ MCP smoke test (python harness): 3/3 yanıt, 52 tool, server_version OK
+✅ Startup: Godot kapalıyken stdio anında yanıt veriyor (kilitlenme yok)
+```
+
+---
+
 ## Proje Özeti
 
 Godot 4 editor'una **C# ile yazılmış** bir MCP (Model Context Protocol) server köprüsü.

@@ -61,7 +61,7 @@ func update_addon_push(params: Dictionary) -> Dictionary:
 		written += 1
 
 	# Yazılan dosyaları Godot'a tanıt (reimport)
-	EditorInterface.reload_resources()
+	EditorInterface.get_resource_filesystem().scan()
 
 	# İlk kurulumda eklentiyi otomatik etkinleştir (kullanıcı etkileşimi sıfır)
 	if not _is_plugin_enabled("GodotMCP"):
@@ -88,22 +88,24 @@ func update_addon(params: Dictionary) -> Dictionary:
 	if not DirAccess.dir_exists_absolute(source):
 		return {"success": false, "error": "Kaynak klasör bulunamadı: " + source}
 
-	var count: int = 0
-	_copy_dir(source, base_path, count)
-	EditorInterface.reload_resources()
+	# BUG FIX: count eskiden değerle geçiyordu, recursive çağrılarda kayboluyordu.
+	# Artık _copy_dir yazılan dosya sayısını döndürüyor.
+	var count: int = _copy_dir(source, base_path)
+	EditorInterface.get_resource_filesystem().scan()
 	return {"success": true, "result": {"written": count, "message": "Addon yerel kaynaktan güncellendi."}}
 
 
-func _copy_dir(src: String, dst: String, count: int) -> void:
+func _copy_dir(src: String, dst: String) -> int:
+	var count: int = 0
 	var da := DirAccess.open(src)
 	if da == null:
-		return
+		return 0
 	da.list_dir_begin()
 	var name := da.get_next()
 	while name != "":
 		if da.current_is_dir():
 			if name != "." and name != "..":
-				_copy_dir(src.path_join(name), dst.path_join(name), count)
+				count += _copy_dir(src.path_join(name), dst.path_join(name))
 		else:
 			var content := FileAccess.get_file_as_string(src.path_join(name))
 			var target := dst.path_join(name)
@@ -115,6 +117,7 @@ func _copy_dir(src: String, dst: String, count: int) -> void:
 				count += 1
 		name = da.get_next()
 	da.list_dir_end()
+	return count
 
 
 # Godot 4'te eklentinin etkin olup olmadığını kontrol et (editor_plugins/enabled ayarı)
