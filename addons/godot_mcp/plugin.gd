@@ -10,7 +10,7 @@ func _enter_tree() -> void:
 	
 	mcp_server = McpServer.new(get_editor_interface(), log_collector)
 	add_child(mcp_server)
-	# Parametresiz: dinamik port aralığı (46300-46400) + lock dosyası.
+	# Parametresiz: dinamik port aralığı (46300-46599) + lock dosyası.
 	mcp_server.start()
 
 func _exit_tree() -> void:

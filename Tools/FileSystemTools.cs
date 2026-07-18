@@ -14,7 +14,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_list", new() { ["path"] = path, ["recursive"] = recursive });
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -28,10 +28,12 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_read_file", new() { ["path"] = path });
-            if (!result.Success) return $"[GodotMCP Hata] {result.Error}";
-            if (result.Result is System.Text.Json.JsonElement je)
-                return je.GetProperty("content").GetString() ?? "";
-            return result.Result?.ToString() ?? "";
+            if (!result.Success) return $"[GodotMCP Hata] {result.FormatError()}";
+            if (result.Result is System.Text.Json.JsonElement je &&
+                je.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                je.TryGetProperty("content", out var content))
+                return content.GetString() ?? "";
+            return result.FormatResult("");
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -46,7 +48,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_write_file", new() { ["path"] = path, ["content"] = content });
-            return result.Success ? $"Dosya yazıldı: {path}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Dosya yazıldı: {path}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -60,7 +62,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_delete", new() { ["path"] = path });
-            return result.Success ? "Silindi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Silindi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -75,7 +77,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_move", new() { ["from"] = from, ["to"] = to });
-            return result.Success ? "Taşındı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Taşındı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -89,7 +91,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_reimport", new() { ["path"] = path });
-            return result.Success ? "Yeniden içe aktarıldı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Yeniden içe aktarıldı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -105,7 +107,7 @@ public class FileSystemTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("filesystem_search", new() { ["pattern"] = pattern, ["path"] = path, ["type"] = type });
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

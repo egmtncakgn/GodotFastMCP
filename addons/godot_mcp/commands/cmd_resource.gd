@@ -1,9 +1,12 @@
 @tool
 extends RefCounted
 
-var _ei: EditorInterface
+# Sorun 7 fix (genişletildi): Godot 4.7'de RefCounted + @tool sınıfında
+# EditorInterface TİPLİ üye değişken de bozuk bytecode üretiyor
+# ("Internal script error! Opcode: 28"). Üye ve parametre TİPSİZ.
+var _ei
 
-func _init(ei: EditorInterface) -> void:
+func _init(ei) -> void:
 	_ei = ei
 
 func get_data(params: Dictionary) -> Dictionary:
@@ -17,9 +20,10 @@ func get_data(params: Dictionary) -> Dictionary:
 	if not res:
 		return {"success": false, "error": "Resource yüklenemedi: " + path}
 	
+	# Sorun 19 fix: get_property_list() döngü DIŞINDA bir kez çağrılır (O(n) maliyet).
+	var prop_list = res.get_property_list()
 	var props = {}
-	for i in res.get_property_list().size():
-		var p = res.get_property_list()[i]
+	for p in prop_list:
 		if p["usage"] & PROPERTY_USAGE_STORAGE:
 			props[p["name"]] = res.get(p["name"])
 	

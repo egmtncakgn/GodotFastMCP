@@ -11,6 +11,7 @@ const MAX_LOGS = 500
 
 var _logs: Array[Dictionary] = []
 var _mutex := Mutex.new()
+var _logger: GodotMCPLogger  # Sorun 20: _exit_tree'de kaldırabilmek için referans
 
 # Logger alt sınıfı: OS.add_logger bunu kabul eder.
 class GodotMCPLogger extends Logger:
@@ -31,8 +32,16 @@ class GodotMCPLogger extends Logger:
 
 func _ready() -> void:
 	if OS.has_method("add_logger"):
-		var l := GodotMCPLogger.new(self)
-		OS.add_logger(l)
+		_logger = GodotMCPLogger.new(self)
+		OS.add_logger(_logger)
+
+# Sorun 20 fix: plugin reload / editor kapanışında eski logger registered kalmasın
+# (duplicate log + memory leak önlenir). Godot 4.5+ OS.remove_logger içerir;
+# yoksa has_method korumasıyla sessizce geçilir.
+func _exit_tree() -> void:
+	if _logger and OS.has_method("remove_logger"):
+		OS.call("remove_logger", _logger)
+		_logger = null
 
 func collect(message: String, level: String = "info") -> void:
 	_mutex.lock()

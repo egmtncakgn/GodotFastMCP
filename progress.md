@@ -1,5 +1,27 @@
 # Godot MCP Server — Progress Log
 
+## ✅ 18 Temmuz 2026 — v1.3.0: issues.md'deki 23 sorunun tamamı çözüldü
+
+- **Sorun 7 (kritik):** 8 `cmd_*.gd`'de `_init(ei: EditorInterface)` → `_init(ei)` (Godot 4.7 regresyonu). Dispatcher'a `new()` null koruması eklendi.
+- **Sorun 8 (kritik):** Port lock uyumsuzluğu — addon artık `%LOCALAPPDATA%\GodotMCP\port.txt`'e JSON yazar (`port`+`project_path`); C# iki formatı da okur, `GODOT_PROJECT_PATH` ile proje doğrulaması yapar.
+- **Sorun 9 (kritik):** `GodotResponse.FormatError()/FormatResult()` merkezi yardımcıları; tüm Tools güncellendi; dispatcher boş hata mesajını doldurur.
+- **Sorun 10-13:** `islemcioyun/project.godot`'a `run/main_scene` eklendi (+`scenes/Main.tscn`); dispatcher result doğrulama; plugin enable `plugin.cfg` yoluyla; `scene_save`→`save_scene_as`, `scene_get_data` diskten okur, `close/get_errors` path doğrular.
+- **Sorun 14-21:** Ölü kod silindi; `update_addon` tool'u eklendi; symlink/junction döngü koruması (`is_link`+visited+MAX_ENTRIES); case-insensitive uzantı; `max_depth` parametresi; `get_property_list()` O(n); `_exit_tree`'de `remove_logger`; screenshot `mode` parametresi (auto 2D/3D).
+- **Sorun 22-29:** Port aralığı 46300-46599 (iki taraf senkron); `_wstest/` + `out/` silindi; port cache davranışı belgelendi; `find_node` iteratif BFS (+ters `_matches` mantığı ek bug'ı düzeltildi); tüm `.cs` UTF-8 no-BOM + mojibake temizlendi; `FormatResult` ile `JsonElement` null tuzağı giderildi.
+- **Deploy:** Addon v1.3.0 → `C:\Projects\islemcioyun\addons\godot_mcp` (13 dosya). Publish: `GodotFastMCP\publish\` v1.3.0. Build: 0 hata 0 uyarı.
+- **Kalan kullanıcı adımı:** Godot'u açıp tool'ları canlı test et (editor_get_state, filesystem_list vb.).
+
+## 🔥 18 Temmuz 2026 (2. tur) — v1.3.1: canlı Godot testinde 3 API hatası düzeltildi
+
+- `EditorInterface.save_scene_as()` 4.7'de void dönüyor → dönüş atanmıyor, başarı `scene_file_path` ile doğrulanıyor.
+- `DirAccess.is_link()` static değil instance metodu → `dir.is_link(name)` (2 yer).
+- Sorun 7 genişletildi: RefCounted+@tool'da tipli ÜYE `var _ei: EditorInterface` de bozuk bytecode (Opcode 28) → 8 dosyada üye de tipsiz.
+- `_create_cmd`'e `can_instantiate()` kontrolü; parse hataları temiz log'a düşüyor.
+- Tüm addon scriptleri `godot --headless --check-only` ile doğrulandı (11/11 OK). Deploy: islemcioyun + publish/addons senkron (v1.3.1).
+
+
+---
+
 ## 🚀 18 Temmuz 2026 — v1.2.0: Ölçeklenebilirlik + Server Self-Update
 
 ### Kritik Bug Düzeltmeleri

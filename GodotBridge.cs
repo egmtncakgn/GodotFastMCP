@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Websocket.Client;
@@ -19,9 +19,9 @@ public class GodotBridge : IAsyncDisposable
     private bool _healthCheckRunning;
 
     /// <summary>
-    /// Her baÅŸarÄ±lÄ± (yeniden) baÄŸlantÄ±dan sonra Ã§aÄŸrÄ±lÄ±r (Ã¶rn. addon auto-update).
-    /// Callback kendi iÃ§inde versiyon kontrolÃ¼ yapar; ucuzdur, her baÄŸlantÄ±da
-    /// gÃ¼venle Ã§aÄŸrÄ±labilir. Null ise devre dÄ±ÅŸÄ±.
+    /// Her başarılı (yeniden) bağlantıdan sonra çağrılır (örn. addon auto-update).
+    /// Callback kendi içinde versiyon kontrolü yapar; ucuzdur, her bağlantıda
+    /// güvenle çağrılabilir. Null ise devre dışı.
     /// </summary>
     public Func<Task>? OnConnected { get; set; }
 
@@ -36,9 +36,9 @@ public class GodotBridge : IAsyncDisposable
         {
             if (IsConnected) return;
 
-            // Ortam deÄŸiÅŸkeni varsa onu kullan (manuel override).
-            // Yoksa Godot'un yazdÄ±ÄŸÄ± lock dosyasÄ±ndan portu oku,
-            // o da yoksa tÃ¼m Ã§akÄ±ÅŸmasÄ±z aralÄ±ÄŸÄ± tara.
+            // Ortam değişkeni varsa onu kullan (manuel override).
+            // Yoksa Godot'un yazdığı lock dosyasından portu oku,
+            // o da yoksa tüm çakışmasız aralığı tara.
             var candidatePorts = ResolveCandidatePorts();
 
             var connectedUrl = await TryConnectAsync(candidatePorts, ct);
@@ -46,35 +46,35 @@ public class GodotBridge : IAsyncDisposable
             if (connectedUrl is null)
             {
                 _connected = false;
-                _logger.LogWarning("[GodotBridge] Godot'a baÄŸlanÄ±lamadÄ±. Godot aÃ§Ä±k mÄ±? Eklenti etkin mi? " +
-                                   "Port aralÄ±ÄŸÄ± {Start}-{End} tarandÄ±.", PortCoordinator.PortRangeStart, PortCoordinator.PortRangeEnd);
-                // NOT: caller'Ä±n ct'si deÄŸil shutdown token kullanÄ±lÄ±r â€” tool isteÄŸi
-                // iptal edildiÄŸinde reconnect dÃ¶ngÃ¼sÃ¼ Ã¶lmemeli.
+                _logger.LogWarning("[GodotBridge] Godot'a bağlanılamadı. Godot açık mı? Eklenti etkin mi? " +
+                                   "Port aralığı {Start}-{End} tarandı.", PortCoordinator.PortRangeStart, PortCoordinator.PortRangeEnd);
+                // NOT: caller'ın ct'si değil shutdown token kullanılır — tool isteği
+                // iptal edildiğinde reconnect döngüsü ölmemeli.
                 ScheduleReconnect(_shutdownCts.Token);
                 return;
             }
 
-            _logger.LogInformation("[GodotBridge] BaÄŸlandÄ± (TCP): {Url}", connectedUrl);
-            _logger.LogInformation("[GodotBridge] âœ… Godot baÄŸlantÄ±sÄ± kuruldu");
+            _logger.LogInformation("[GodotBridge] Bağlandı (TCP): {Url}", connectedUrl);
+            _logger.LogInformation("[GodotBridge] ✅ Godot bağlantısı kuruldu");
             _connected = true;
             _reconnectAttempts = 0;
             StartHealthCheck(_shutdownCts.Token);
 
-            // Her baÄŸlantÄ±da addon versiyon kontrolÃ¼ + gerekiyorsa gÃ¼ncelleme
-            // (callback ucuzdur: versiyon eÅŸitse dosya gÃ¶ndermez)
+            // Her bağlantıda addon versiyon kontrolü + gerekiyorsa güncelleme
+            // (callback ucuzdur: versiyon eşitse dosya göndermez)
             if (OnConnected is not null)
             {
                 _ = Task.Run(async () =>
                 {
                     try { await OnConnected.Invoke(); }
-                    catch (Exception ex) { _logger.LogWarning("[GodotBridge] Auto-update hatasÄ±: {Message}", ex.Message); }
+                    catch (Exception ex) { _logger.LogWarning("[GodotBridge] Auto-update hatası: {Message}", ex.Message); }
                 });
             }
         }
         catch (Exception ex)
         {
             _connected = false;
-            _logger.LogWarning("[GodotBridge] BaÄŸlantÄ± hatasÄ±: {Message}", ex.Message);
+            _logger.LogWarning("[GodotBridge] Bağlantı hatası: {Message}", ex.Message);
             ScheduleReconnect(_shutdownCts.Token);
         }
         finally
@@ -86,6 +86,7 @@ public class GodotBridge : IAsyncDisposable
     private List<int> ResolveCandidatePorts()
     {
         var ports = new List<int>();
+        int? deferredLockPort = null;
 
         // 1) Manuel env override (GODOT_MCP_WS_URL=ws://127.0.0.1:PORT)
         var env = Environment.GetEnvironmentVariable("GODOT_MCP_WS_URL");
@@ -95,22 +96,41 @@ public class GodotBridge : IAsyncDisposable
             return ports;
         }
 
-        // 2) Godot'un lock dosyasÄ±na yazdÄ±ÄŸÄ± port (en olasÄ± doÄŸru hedef)
-        var cached = PortCoordinator.ReadCachedPort();
-        if (cached is { } p) ports.Add(p);
+        // 2) Godot'un paylaşılan lock dosyasına yazdığı port (en olası doğru hedef).
+        //    Sorun 8 fix: lock artık JSON (port + project_path). GODOT_PROJECT_PATH
+        //    ayarlıysa ve lock başka projeye aitse, o portu listenin SONUNA ertele
+        //    (birden fazla Godot projesi açıkken yanlış projeye bağlanmayı zorlaştırır).
+        var (cached, lockProject) = PortCoordinator.ReadCachedLock();
+        if (cached is { } p)
+        {
+            var expected = Environment.GetEnvironmentVariable("GODOT_PROJECT_PATH");
+            if (!string.IsNullOrWhiteSpace(expected) && !string.IsNullOrWhiteSpace(lockProject) &&
+                !PathsEqual(expected, lockProject))
+            {
+                deferredLockPort = p;
+                _logger.LogDebug("[GodotBridge] Lock portu {Port} başka projeye ait ({Project}), sona ertelendi.", p, lockProject);
+            }
+            else
+            {
+                ports.Add(p);
+            }
+        }
 
-        // 3) TÃ¼m Ã§akÄ±ÅŸmasÄ±z aralÄ±ÄŸÄ± tara
+        // 3) Tüm çakışmasız aralığı tara
         for (int port = PortCoordinator.PortRangeStart; port <= PortCoordinator.PortRangeEnd; port++)
             if (!ports.Contains(port)) ports.Add(port);
+
+        if (deferredLockPort is { } dp && !ports.Contains(dp))
+            ports.Add(dp);
 
         return ports;
     }
 
     private async Task<string?> TryConnectAsync(List<int> ports, CancellationToken ct)
     {
-        // 1) HÄ±zlÄ± TCP taramasÄ±: kapalÄ± portlarda WebSocket handshake denemek
-        //    pahalÄ±dÄ±r (300ms+ bekleme). Connection refused ~1ms dÃ¶ner.
-        //    100 portluk aralÄ±k Godot kapalÄ±yken <1 saniyede elenir.
+        // 1) Hızlı TCP taraması: kapalı portlarda WebSocket handshake denemek
+        //    pahalıdır (300ms+ bekleme). Connection refused ~1ms döner.
+        //    Geniş aralık Godot kapalıyken bile <1 saniyede elenir.
         var openPorts = new List<int>();
         foreach (var port in ports)
         {
@@ -121,11 +141,11 @@ public class GodotBridge : IAsyncDisposable
 
         if (openPorts.Count == 0)
         {
-            _logger.LogDebug("[GodotBridge] Taranan aralÄ±kta aÃ§Ä±k port yok (Godot kapalÄ± olabilir).");
+            _logger.LogDebug("[GodotBridge] Taranan aralıkta açık port yok (Godot kapalı olabilir).");
             return null;
         }
 
-        // 2) Sadece aÃ§Ä±k portlarda WS handshake + Godot doÄŸrulamasÄ±
+        // 2) Sadece açık portlarda WS handshake + Godot doğrulaması
         foreach (var port in openPorts)
         {
             var url = $"ws://127.0.0.1:{port}";
@@ -136,7 +156,7 @@ public class GodotBridge : IAsyncDisposable
 
                 // Eski client varsa kapat
                 if (_client?.IsRunning == true)
-                    _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "Yeniden baÄŸlanÄ±lÄ±yor");
+                    _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "Yeniden bağlanılıyor");
 
                 _client = new WebsocketClient(new Uri(url))
                 {
@@ -153,24 +173,24 @@ public class GodotBridge : IAsyncDisposable
                 if (!_client.IsRunning)
                     continue;
 
-                // SADECE handshake yetmez: yanlÄ±ÅŸ Godot/node'a baÄŸlanmamak iÃ§in
-                // Godot'dan gerÃ§ek bir "pong" yanÄ±tÄ± gelene kadar baÄŸlantÄ± sayÄ±lmaz.
+                // SADECE handshake yetmez: yanlış Godot/node'a bağlanmamak için
+                // Godot'dan gerçek bir "pong" yanıtı gelene kadar bağlantı sayılmaz.
                 if (await VerifyGodotConnectionAsync(ct))
                     return url;
 
-                _logger.LogDebug("[GodotBridge] Port {Port} handshake kabul etti ama Godot deÄŸil (ping yanÄ±tsÄ±z).", port);
-                _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "DoÄŸrulanamadÄ±");
+                _logger.LogDebug("[GodotBridge] Port {Port} handshake kabul etti ama doğrulama başarısız (ping veya proje eşleşmesi).", port);
+                _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "Doğrulanamadı");
             }
             catch (Exception ex)
             {
-                _logger.LogDebug("[GodotBridge] Port {Port} baÅŸarÄ±sÄ±z: {Message}", port, ex.Message);
+                _logger.LogDebug("[GodotBridge] Port {Port} başarısız: {Message}", port, ex.Message);
             }
         }
 
         return null;
     }
 
-    /// <summary>TCP seviyesinde hÄ±zlÄ± port probe (localhost'ta refused ~1ms).</summary>
+    /// <summary>TCP seviyesinde hızlı port probe (localhost'ta refused ~1ms).</summary>
     private static async Task<bool> IsTcpOpenAsync(int port, CancellationToken ct)
     {
         using var socket = new System.Net.Sockets.Socket(
@@ -193,11 +213,58 @@ public class GodotBridge : IAsyncDisposable
         try
         {
             var pong = await SendAsync("ping", null, timeoutSeconds: ConnectVerifyTimeoutMs / 1000, ct: ct);
-            return pong.Success;
+            if (!pong.Success)
+                return false;
+
+            // Sorun 8 fix: GODOT_PROJECT_PATH ayarlıysa doğru projeye bağlandığımızı
+            // doğrula (aynı anda birden fazla Godot projesi açıksa yanlış editor'a
+            // bağlanmayı önler). Komut başarısız olursa (eski addon) doğrulama
+            // atlanır ve bağlantı kabul edilir.
+            var expected = Environment.GetEnvironmentVariable("GODOT_PROJECT_PATH");
+            if (!string.IsNullOrWhiteSpace(expected))
+            {
+                var pathResp = await SendAsync("editor_get_project_path", null,
+                    timeoutSeconds: ConnectVerifyTimeoutMs / 1000, ct: ct);
+                if (pathResp.Success && pathResp.Result is JsonElement je &&
+                    je.ValueKind == JsonValueKind.Object && je.TryGetProperty("path", out var pp))
+                {
+                    if (!PathsEqual(expected, pp.GetString()))
+                    {
+                        _logger.LogWarning(
+                            "[GodotBridge] Bağlanılan proje ({Actual}) beklenenden ({Expected}) farklı; sonraki aday denenecek.",
+                            pp.GetString(), expected);
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>İki dosya yolunu normalize edip büyük/küçük harfe duyarsız karşılaştırır.</summary>
+    private static bool PathsEqual(string? a, string? b)
+    {
+        var na = NormalizePath(a);
+        var nb = NormalizePath(b);
+        return na is not null && nb is not null &&
+               string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        try
+        {
+            return Path.GetFullPath(path.Trim())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.Trim().TrimEnd('\\', '/');
         }
     }
 
@@ -214,7 +281,7 @@ public class GodotBridge : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[GodotBridge] Mesaj ayrÄ±ÅŸtÄ±rÄ±lamadÄ±: {Msg}", msg.Text);
+                _logger.LogError(ex, "[GodotBridge] Mesaj ayrıştırılamadı: {Msg}", msg.Text);
             }
         });
 
@@ -224,7 +291,7 @@ public class GodotBridge : IAsyncDisposable
             {
                 _connected = false;
                 var delay = CalculateBackoff();
-                _logger.LogWarning("[GodotBridge] BaÄŸlantÄ± koptu ({Type}). {Delay}ms sonra tekrar denenecek...",
+                _logger.LogWarning("[GodotBridge] Bağlantı koptu ({Type}). {Delay}ms sonra tekrar denenecek...",
                     info.Type, delay);
                 ScheduleReconnect(_shutdownCts.Token, delay);
             }
@@ -233,7 +300,7 @@ public class GodotBridge : IAsyncDisposable
         _client.ReconnectionHappened.Subscribe(info =>
         {
             _connected = true;
-            _logger.LogInformation("[GodotBridge] Yeniden baÄŸlanÄ±ldÄ±: {Type}", info.Type);
+            _logger.LogInformation("[GodotBridge] Yeniden bağlanıldı: {Type}", info.Type);
         });
     }
 
@@ -255,10 +322,10 @@ public class GodotBridge : IAsyncDisposable
                 if (!ct.IsCancellationRequested)
                     await ConnectAsync(ct);
             }
-            catch (OperationCanceledException) { /* kapanÄ±ÅŸ */ }
+            catch (OperationCanceledException) { /* kapanış */ }
             catch (Exception ex)
             {
-                _logger.LogDebug("[GodotBridge] Reconnect denemesi hatasÄ±: {Message}", ex.Message);
+                _logger.LogDebug("[GodotBridge] Reconnect denemesi hatası: {Message}", ex.Message);
             }
         }, ct);
     }
@@ -280,7 +347,7 @@ public class GodotBridge : IAsyncDisposable
                     var pong = await SendAsync("ping", null, timeoutSeconds: 5, ct: ct);
                     if (!pong.Success)
                     {
-                        _logger.LogWarning("[GodotBridge] Health check baÅŸarÄ±sÄ±z: {Error}", pong.Error);
+                        _logger.LogWarning("[GodotBridge] Health check başarısız: {Error}", pong.Error);
                         _connected = false;
                         ScheduleReconnect(ct);
                         break;
@@ -288,7 +355,7 @@ public class GodotBridge : IAsyncDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("[GodotBridge] Health check hatasÄ±: {Message}", ex.Message);
+                    _logger.LogWarning("[GodotBridge] Health check hatası: {Message}", ex.Message);
                     _connected = false;
                     ScheduleReconnect(ct);
                     break;
@@ -311,8 +378,8 @@ public class GodotBridge : IAsyncDisposable
                 return new GodotResponse
                 {
                     Success = false,
-                    Error = "Godot Editor'e baÄŸlanÄ±lamadÄ±. Godot'un aÃ§Ä±k olduÄŸundan ve " +
-                             "GodotMCP eklentisinin etkin olduÄŸundan emin olun."
+                    Error = "Godot Editor'e bağlanılamadı. Godot'un açık olduğundan ve " +
+                             "GodotMCP eklentisinin etkin olduğundan emin olun."
                 };
         }
 
@@ -327,7 +394,7 @@ public class GodotBridge : IAsyncDisposable
         timeoutCts.Token.Register(() =>
         {
             if (_pending.TryRemove(request.Id, out var t))
-                t.TrySetException(new TimeoutException($"Godot yanÄ±t vermedi ({timeoutSeconds}s)."));
+                t.TrySetException(new TimeoutException($"Godot yanıt vermedi ({timeoutSeconds}s)."));
         });
 
         _client!.Send(json);
@@ -341,7 +408,7 @@ public class GodotBridge : IAsyncDisposable
             return new GodotResponse
             {
                 Success = false,
-                Error = $"Godot yanÄ±t vermedi ({timeoutSeconds}s). Komut Ã§ok karmaÅŸÄ±k olabilir veya Godot meÅŸgul."
+                Error = $"Godot yanıt vermedi ({timeoutSeconds}s). Komut çok karmaşık olabilir veya Godot meşgul."
             };
         }
     }
@@ -351,7 +418,7 @@ public class GodotBridge : IAsyncDisposable
         try
         {
             if (_client is not null && _client.IsRunning)
-                _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "MCP kapanÄ±yor");
+                _ = _client.Stop(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "MCP kapanıyor");
         }
         catch { /* yoksay */ }
         finally

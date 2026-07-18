@@ -1,9 +1,12 @@
 @tool
 extends RefCounted
 
-var _ei: EditorInterface
+# Sorun 7 fix (genişletildi): Godot 4.7'de RefCounted + @tool sınıfında
+# EditorInterface TİPLİ üye değişken de bozuk bytecode üretiyor
+# ("Internal script error! Opcode: 28"). Üye ve parametre TİPSİZ.
+var _ei
 
-func _init(ei: EditorInterface) -> void:
+func _init(ei) -> void:
 	_ei = ei
 
 func find_node(params: Dictionary) -> Dictionary:
@@ -17,14 +20,19 @@ func find_node(params: Dictionary) -> Dictionary:
 	
 	var results = []
 	_collect_nodes(scene_root, name_filter, type_filter, path_filter, results)
-	
+
 	return {"success": true, "result": {"nodes": results}}
 
-func _collect_nodes(node: Node, name_f: String, type_f: String, path_f: String, out: Array) -> void:
-	if not _matches(node, name_f, type_f, path_f):
-		out.append({"name": node.name, "type": node.get_class(), "path": str(node.get_path())})
-	for child in node.get_children():
-		_collect_nodes(child, name_f, type_f, path_f, out)
+# Sorun 27 fix: recursion yerine iteratif BFS (derin ağaçlarda stack overflow yok).
+# EK BUG FIX: eski kod "not _matches" ile eşleşmEYEN node'ları topluyordu (ters mantık).
+func _collect_nodes(root: Node, name_f: String, type_f: String, path_f: String, out: Array) -> void:
+	var queue: Array = [root]
+	while not queue.is_empty():
+		var node: Node = queue.pop_front()
+		if _matches(node, name_f, type_f, path_f):
+			out.append({"name": node.name, "type": node.get_class(), "path": str(node.get_path())})
+		for child in node.get_children():
+			queue.append(child)
 
 func _matches(node: Node, name_f: String, type_f: String, path_f: String) -> bool:
 	if not name_f.is_empty() and node.name != name_f:
@@ -70,12 +78,13 @@ func get_properties(params: Dictionary) -> Dictionary:
 	if not node:
 		return {"success": false, "error": "Node bulunamadı: " + node_path}
 	
+	# Sorun 19 fix: get_property_list() döngü DIŞINDA bir kez çağrılır (O(n) maliyet).
+	var prop_list = node.get_property_list()
 	var props = []
-	for i in node.get_property_list().size():
-		var p = node.get_property_list()[i]
+	for p in prop_list:
 		if p["usage"] & PROPERTY_USAGE_EDITOR:
 			props.append({"name": p["name"], "value": node.get(p["name"])})
-	
+
 	return {"success": true, "result": {"properties": props}}
 
 func set_property(params: Dictionary) -> Dictionary:

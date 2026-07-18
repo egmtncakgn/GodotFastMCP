@@ -15,7 +15,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_find", new() { ["name"] = name, ["type"] = type, ["path"] = path });
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -31,7 +31,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_create", new() { ["type"] = type, ["name"] = name, ["parent_path"] = parentPath });
-            return result.Success ? $"Node oluşturuldu: {name}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Node oluşturuldu: {name}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -45,7 +45,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_get_properties", new() { ["node_path"] = nodePath });
-            return result.Success ? result.Result.ToString() ?? "{}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("{}") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -61,7 +61,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_set_property", new() { ["node_path"] = nodePath, ["property"] = property, ["value"] = value });
-            return result.Success ? $"Property ayarlandı: {property}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Property ayarlandı: {property}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -77,7 +77,7 @@ public class NodeTools(GodotBridge bridge)
         {
             var props = JsonSerializer.Deserialize<Dictionary<string, object?>>(propertiesJson);
             var result = await bridge.SendAsync("node_set_properties", new() { ["node_path"] = nodePath, ["properties"] = props });
-            return result.Success ? "Property'ler ayarlandı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Property'ler ayarlandı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -91,7 +91,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_delete", new() { ["node_path"] = nodePath });
-            return result.Success ? "Node silindi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Node silindi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -106,7 +106,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_reparent", new() { ["node_path"] = nodePath, ["new_parent_path"] = newParentPath });
-            return result.Success ? "Node taşındı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Node taşındı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -121,7 +121,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_duplicate", new() { ["node_path"] = nodePath, ["new_name"] = newName });
-            return result.Success ? "Node kopyalandı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Node kopyalandı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -136,7 +136,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_rename", new() { ["node_path"] = nodePath, ["new_name"] = newName });
-            return result.Success ? $"Node yeniden adlandırıldı: {newName}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Node yeniden adlandırıldı: {newName}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -152,7 +152,7 @@ public class NodeTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("node_instance_scene", new() { ["scene_path"] = scenePath, ["parent_path"] = parentPath, ["name"] = name });
-            return result.Success ? "Sahne instance edildi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Sahne instance edildi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

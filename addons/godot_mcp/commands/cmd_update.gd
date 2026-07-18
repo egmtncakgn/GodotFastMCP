@@ -2,9 +2,12 @@
 extends RefCounted
 class_name CmdUpdate
 
-var _ei: EditorInterface
+# Sorun 7 fix (genişletildi): Godot 4.7'de RefCounted + @tool sınıfında
+# EditorInterface TİPLİ üye değişken de bozuk bytecode üretiyor
+# ("Internal script error! Opcode: 28"). Üye ve parametre TİPSİZ.
+var _ei
 
-func _init(ei: EditorInterface) -> void:
+func _init(ei) -> void:
 	_ei = ei
 
 # C#'tan gelen dosya içeriklerini diske yazar ve reimport eder.
@@ -64,8 +67,8 @@ func update_addon_push(params: Dictionary) -> Dictionary:
 	EditorInterface.get_resource_filesystem().scan()
 
 	# İlk kurulumda eklentiyi otomatik etkinleştir (kullanıcı etkileşimi sıfır)
-	if not _is_plugin_enabled("GodotMCP"):
-		_enable_plugin("GodotMCP")
+	if not _is_plugin_enabled():
+		_enable_plugin()
 
 	if failed.size() > 0:
 		return {"success": false, "error": "Bazı dosyalar yazılamadı: %s" % str(failed), "result": {"written": written}}
@@ -120,16 +123,23 @@ func _copy_dir(src: String, dst: String) -> int:
 	return count
 
 
+# Sorun 12 fix: Godot 4'te editor_plugins/enabled dizisi plugin ADI değil
+# plugin.cfg YOLU saklar ("res://addons/godot_mcp/plugin.cfg").
+# Eski kod "GodotMCP" adını kontrol edip ekliyordu → her zaman false dönüyor,
+# diziye geçersiz "GodotMCP" değeri ekleniyordu.
+const PLUGIN_CONFIG_PATH := "res://addons/godot_mcp/plugin.cfg"
+
+
 # Godot 4'te eklentinin etkin olup olmadığını kontrol et (editor_plugins/enabled ayarı)
-func _is_plugin_enabled(plugin_name: String) -> bool:
+func _is_plugin_enabled() -> bool:
 	var enabled: Array = ProjectSettings.get_setting("editor_plugins/enabled", [])
-	return enabled.has(plugin_name)
+	return enabled.has(PLUGIN_CONFIG_PATH)
 
 
 # Eklentiyi otomatik etkinleştir (ilk kurulumda manuel adımı ortadan kaldırır)
-func _enable_plugin(plugin_name: String) -> void:
+func _enable_plugin() -> void:
 	var enabled: Array = ProjectSettings.get_setting("editor_plugins/enabled", [])
-	if not enabled.has(plugin_name):
-		enabled.append(plugin_name)
+	if not enabled.has(PLUGIN_CONFIG_PATH):
+		enabled.append(PLUGIN_CONFIG_PATH)
 	ProjectSettings.set_setting("editor_plugins/enabled", enabled)
 	ProjectSettings.save()

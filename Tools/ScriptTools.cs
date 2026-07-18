@@ -12,10 +12,12 @@ public class ScriptTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("script_read", new() { ["path"] = path });
-            if (!result.Success) return $"[GodotMCP Hata] {result.Error}";
-            if (result.Result is System.Text.Json.JsonElement je)
-                return je.GetProperty("content").GetString() ?? "";
-            return result.Result?.ToString() ?? "";
+            if (!result.Success) return $"[GodotMCP Hata] {result.FormatError()}";
+            if (result.Result is System.Text.Json.JsonElement je &&
+                je.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                je.TryGetProperty("content", out var content))
+                return content.GetString() ?? "";
+            return result.FormatResult("");
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -31,7 +33,7 @@ public class ScriptTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("script_create", new() { ["path"] = path, ["content"] = content, ["language"] = language });
-            return result.Success ? $"Script oluşturuldu: {path}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Script oluşturuldu: {path}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -46,7 +48,7 @@ public class ScriptTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("script_update", new() { ["path"] = path, ["content"] = content });
-            return result.Success ? "Script güncellendi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Script güncellendi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -60,7 +62,7 @@ public class ScriptTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("script_delete", new() { ["path"] = path });
-            return result.Success ? "Script silindi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Script silindi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -75,21 +77,21 @@ public class ScriptTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("script_attach_to_node", new() { ["node_path"] = nodePath, ["script_path"] = scriptPath });
-            return result.Success ? "Script node'a bağlandı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Script node'a bağlandı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
     }
 
     [McpServerTool(Name = "script_get_errors")]
-    [Description("Aktif script'teki hata/uyarıları döndürür.")]
+    [Description("Aktif script'teki hata/uyarıları döndürür. Not: Godot API'si sadece aktif script'i destekler; path verilirse aktif script'le eşleşmesi doğrulanır.")]
     public async Task<string> GetErrors(
-        [Description("Script yolu (opsiyonel)")] string? path = null)
+        [Description("Script yolu (opsiyonel; aktif script'ten farklıysa hata döner)")] string? path = null)
     {
         try
         {
             var result = await bridge.SendAsync("script_get_errors", new() { ["path"] = path });
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

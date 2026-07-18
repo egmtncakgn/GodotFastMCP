@@ -12,7 +12,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_play");
-            return result.Success ? "Oyun başlatıldı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Oyun başlatıldı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -25,7 +25,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_stop");
-            return result.Success ? "Oyun durduruldu." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Oyun durduruldu." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -38,7 +38,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_pause");
-            return result.Success ? "Oyun duraklatma durumu değiştirildi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Oyun duraklatma durumu değiştirildi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -51,7 +51,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_get_state");
-            return result.Success ? result.Result.ToString() ?? "{}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("{}") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -64,7 +64,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_selection_get");
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -79,7 +79,7 @@ public class EditorTools(GodotBridge bridge)
         {
             var paths = JsonSerializer.Deserialize<string[]>(nodePathsJson);
             var result = await bridge.SendAsync("editor_selection_set", new() { ["node_paths"] = paths });
-            return result.Success ? "Seçim güncellendi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Seçim güncellendi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -96,7 +96,7 @@ public class EditorTools(GodotBridge bridge)
             if (!string.IsNullOrEmpty(keysJson))
                 keys = JsonSerializer.Deserialize<string[]>(keysJson);
             var result = await bridge.SendAsync("editor_get_project_settings", new() { ["keys"] = keys });
-            return result.Success ? result.Result.ToString() ?? "{}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("{}") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -112,7 +112,7 @@ public class EditorTools(GodotBridge bridge)
         {
             var value = JsonSerializer.Deserialize<object>(valueJson);
             var result = await bridge.SendAsync("editor_set_project_setting", new() { ["key"] = key, ["value"] = value });
-            return result.Success ? "Proje ayarı güncellendi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Proje ayarı güncellendi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -125,7 +125,7 @@ public class EditorTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("editor_get_project_path");
-            return result.Success ? result.Result.ToString() ?? "" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

@@ -15,7 +15,7 @@ public class SceneTools(GodotBridge bridge)
             var result = await bridge.SendAsync("scene_open", new() { ["path"] = path });
             return result.Success
                 ? $"Sahne açıldı: {path}"
-                : $"[GodotMCP Hata] {result.Error}";
+                : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {
@@ -36,7 +36,7 @@ public class SceneTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("scene_save", new() { ["path"] = path });
-            return result.Success ? "Sahne kaydedildi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Sahne kaydedildi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {
@@ -57,7 +57,7 @@ public class SceneTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("scene_create", new() { ["path"] = path, ["root_node_type"] = rootNodeType });
-            return result.Success ? $"Sahne oluşturuldu: {path}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Sahne oluşturuldu: {path}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {
@@ -76,7 +76,7 @@ public class SceneTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("scene_list_opened");
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {
@@ -89,14 +89,19 @@ public class SceneTools(GodotBridge bridge)
     }
 
     [McpServerTool(Name = "scene_get_data")]
-    [Description("Aktif sahnenin node ağacı yapısını döndürür.")]
+    [Description("Sahne node ağacı yapısını döndürür. path verilirse sahne editor'de açılmadan diskten okunur; verilmezse aktif sahne kullanılır.")]
     public async Task<string> GetData(
-        [Description("Verisi alınacak sahne yolu (opsiyonel)")] string? path = null)
+        [Description("Verisi alınacak sahne yolu (opsiyonel, ör: res://scenes/Main.tscn)")] string? path = null,
+        [Description("Maksimum derinlik (varsayılan 10)")] int? maxDepth = null)
     {
         try
         {
-            var result = await bridge.SendAsync("scene_get_data", new() { ["path"] = path });
-            return result.Success ? result.Result.ToString() ?? "{}" : $"[GodotMCP Hata] {result.Error}";
+            var result = await bridge.SendAsync("scene_get_data", new()
+            {
+                ["path"] = path,
+                ["max_depth"] = maxDepth
+            });
+            return result.Success ? result.FormatResult("{}") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {
@@ -109,14 +114,14 @@ public class SceneTools(GodotBridge bridge)
     }
 
     [McpServerTool(Name = "scene_close")]
-    [Description("Aktif sahneyi kapatır.")]
+    [Description("Aktif sahneyi kapatır. Not: Godot API'si sadece aktif sahneyi kapatabilir; path verilirse aktif sahneyle eşleşmesi doğrulanır.")]
     public async Task<string> CloseScene(
-        [Description("Kapatılacak sahne yolu (opsiyonel)")] string? path = null)
+        [Description("Kapatılacak sahne yolu (opsiyonel; aktif sahneden farklıysa hata döner)")] string? path = null)
     {
         try
         {
             var result = await bridge.SendAsync("scene_close", new() { ["path"] = path });
-            return result.Success ? "Sahne kapatıldı." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Sahne kapatıldı." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException)
         {

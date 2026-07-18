@@ -13,7 +13,7 @@ public class ConsoleTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("console_get_logs", new() { ["count"] = count, ["level"] = level });
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -26,7 +26,7 @@ public class ConsoleTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("console_clear_logs");
-            return result.Success ? "Loglar temizlendi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Loglar temizlendi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -39,7 +39,7 @@ public class ConsoleTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("console_get_errors");
-            return result.Success ? result.Result.ToString() ?? "[]" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("[]") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

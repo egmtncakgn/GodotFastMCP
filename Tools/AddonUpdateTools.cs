@@ -176,7 +176,7 @@ public class AddonUpdateTools(GodotBridge bridge, ILogger<AddonUpdateTools> logg
         if (result.Success)
             _logger.LogInformation("[GodotMCP] Auto-update tamamlandı ({Count} dosya).", files.Count);
         else
-            _logger.LogWarning("[GodotMCP] Auto-update başarısız: {Error}", result.Error);
+            _logger.LogWarning("[GodotMCP] Auto-update başarısız: {Error}", result.FormatError());
     }
 
     /// <summary>Addon dizininden yukarı çıkarak .git içeren repo kökünü bulur (yoksa null).</summary>
@@ -187,6 +187,29 @@ public class AddonUpdateTools(GodotBridge bridge, ILogger<AddonUpdateTools> logg
             if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
                 return dir.FullName;
         return null;
+    }
+
+    // Sorun 15 fix: Godot tarafında "update_addon" komutu zaten kayıtlıydı ama
+    // MCP tool olarak expose edilmemişti (API yüzeyi tutarsızdı).
+    [McpServerTool(Name = "update_addon")]
+    [Description("Godot içinden addon'u yerel bir res:// kaynağından günceller (Godot tarafında klasör kopyalama). source parametresi res:// ile başlamalıdır. Not: dosyaları C# tarafından göndermek için 'update_addon_push' kullanın.")]
+    public async Task<string> UpdateAddon(
+        [Description("Kaynak klasör (res:// ile başlamalı, ör: res://addons/godot_mcp_yeni)")] string source,
+        [Description("Hedef addon klasörü (varsayılan: res://addons/godot_mcp)")] string? basePath = null)
+    {
+        try
+        {
+            var result = await bridge.SendAsync("update_addon", new()
+            {
+                ["source"] = source,
+                ["base_path"] = basePath ?? "res://addons/godot_mcp"
+            }, timeoutSeconds: 60);
+            return result.Success
+                ? $"[GodotMCP] Addon yerel kaynaktan güncellendi: {source}"
+                : $"[GodotMCP Hata] {result.FormatError()}";
+        }
+        catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
+        catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
     }
 
     [McpServerTool(Name = "update_addon_push")]
@@ -234,7 +257,7 @@ public class AddonUpdateTools(GodotBridge bridge, ILogger<AddonUpdateTools> logg
 
             return result.Success
                 ? $"[GodotMCP] Addon Godot'a gönderildi ({files.Count} dosya).{(pullWarning != null ? " " + pullWarning : "")} Godot reimport yaptı."
-                : $"[GodotMCP Hata] {result.Error}";
+                : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Addon push hatası: {ex.Message}"; }

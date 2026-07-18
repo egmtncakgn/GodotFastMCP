@@ -13,7 +13,7 @@ public class ResourceTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("resource_get_data", new() { ["path"] = path });
-            return result.Success ? result.Result.ToString() ?? "{}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? result.FormatResult("{}") : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -29,7 +29,7 @@ public class ResourceTools(GodotBridge bridge)
         {
             var props = JsonSerializer.Deserialize<Dictionary<string, object?>>(propertiesJson);
             var result = await bridge.SendAsync("resource_modify", new() { ["path"] = path, ["properties"] = props });
-            return result.Success ? "Resource güncellendi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Resource güncellendi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -48,7 +48,7 @@ public class ResourceTools(GodotBridge bridge)
             if (!string.IsNullOrEmpty(propertiesJson))
                 props = JsonSerializer.Deserialize<Dictionary<string, object?>>(propertiesJson);
             var result = await bridge.SendAsync("resource_create", new() { ["path"] = path, ["type"] = type, ["properties"] = props });
-            return result.Success ? $"Resource oluşturuldu: {path}" : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? $"Resource oluşturuldu: {path}" : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }
@@ -62,7 +62,7 @@ public class ResourceTools(GodotBridge bridge)
         try
         {
             var result = await bridge.SendAsync("resource_delete", new() { ["path"] = path });
-            return result.Success ? "Resource silindi." : $"[GodotMCP Hata] {result.Error}";
+            return result.Success ? "Resource silindi." : $"[GodotMCP Hata] {result.FormatError()}";
         }
         catch (TimeoutException) { return "[GodotMCP] Godot yanıt vermedi."; }
         catch (Exception ex) { return $"[GodotMCP] Beklenmedik hata: {ex.Message}"; }

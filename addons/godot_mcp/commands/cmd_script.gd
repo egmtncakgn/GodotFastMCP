@@ -1,9 +1,12 @@
 @tool
 extends RefCounted
 
-var _ei: EditorInterface
+# Sorun 7 fix (genişletildi): Godot 4.7'de RefCounted + @tool sınıfında
+# EditorInterface TİPLİ üye değişken de bozuk bytecode üretiyor
+# ("Internal script error! Opcode: 28"). Üye ve parametre TİPSİZ.
+var _ei
 
-func _init(ei: EditorInterface) -> void:
+func _init(ei) -> void:
 	_ei = ei
 
 func read_script(params: Dictionary) -> Dictionary:
@@ -83,10 +86,22 @@ func attach_to_node(params: Dictionary) -> Dictionary:
 	return {"success": true, "result": {"message": "Script node'a bağlandı."}}
 
 func get_errors(params: Dictionary) -> Dictionary:
+	# Sorun 13 fix: ScriptEditor API'si sadece AKTİF script'in uyarılarını verir.
+	# path verilmişse ve aktif script'le eşleşmiyorsa sessizce yoksaymak yerine
+	# açık hata döndür.
 	var path: String = params.get("path", "")
 	var script_editor = _ei.get_script_editor()
 	if not script_editor:
 		return {"success": false, "error": "Script editor bulunamadı."}
-	
-	var errors = script_editor.get_warnings()
+
+	if not path.is_empty():
+		var current = script_editor.get_current_script()
+		var current_path: String = current.resource_path if current else ""
+		if current_path != path:
+			return {"success": false, "error": "Sadece aktif script destekleniyor (aktif: '%s'). Script'i editor'de açın veya path parametresini boş bırakın." % current_path}
+
+	if not script_editor.has_method("get_warnings"):
+		return {"success": false, "error": "Bu Godot sürümünde ScriptEditor.get_warnings() API'si bulunmuyor."}
+
+	var errors = script_editor.call("get_warnings")
 	return {"success": true, "result": {"errors": errors}}

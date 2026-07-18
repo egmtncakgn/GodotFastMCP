@@ -1,42 +1,44 @@
 @tool
 extends RefCounted
 
-var _ei: EditorInterface
+# Sorun 7 fix (genişletildi): Godot 4.7'de RefCounted + @tool sınıfında
+# EditorInterface TİPLİ üye değişken de bozuk bytecode üretiyor
+# ("Internal script error! Opcode: 28"). Üye ve parametre TİPSİZ.
+var _ei
 
-func _init(ei: EditorInterface) -> void:
+func _init(ei) -> void:
 	_ei = ei
 
 func play(params: Dictionary) -> Dictionary:
-	if _ei.is_playing():
+	# Sorun 32 fix: EditorInterface.is_playing() Godot 4.x'te YOK; doğru API is_playing_scene().
+	if _ei.is_playing_scene():
 		return {"success": false, "error": "Oyun zaten çalışıyor."}
 	_ei.play_main_scene()
 	return {"success": true, "result": {"message": "Oyun başlatıldı."}}
 
 func stop(params: Dictionary) -> Dictionary:
-	if not _ei.is_playing():
+	if not _ei.is_playing_scene():
 		return {"success": false, "error": "Oyun çalışmıyor."}
-	_ei.stop_playing()
+	# Sorun 32 fix: stop_playing() Godot 4.7'de yok; stop_playing_scene() kullanılır.
+	_ei.stop_playing_scene()
 	return {"success": true, "result": {"message": "Oyun durduruldu."}}
 
 func pause(params: Dictionary) -> Dictionary:
-	var state = _ei.get_editor_playback()
-	if not state:
+	# Sorun 32 fix: Godot 4.7'de EditorPlayback sınıfı kaldırıldı; editor API'si
+	# üzerinden çalışan oyunu pause etmenin yolu yok (oyun ayrı process).
+	# Sessizce yanlış sonuç dönmek yerine açık hata ver.
+	if not _ei.is_playing_scene():
 		return {"success": false, "error": "Oyun çalışmıyor."}
-	state.paused = not state.paused
-	return {"success": true, "result": {"paused": state.paused}}
+	return {"success": false, "error": "Godot 4.7 editor API'sinde pause desteği yok (EditorPlayback kaldırıldı)."}
 
 func get_state(params: Dictionary) -> Dictionary:
-	var playing = _ei.is_playing()
-	var paused = false
-	var state = _ei.get_editor_playback()
-	if state:
-		paused = state.paused
-	
-	var status = "stopped"
-	if playing:
-		status = "paused" if paused else "playing"
-	
-	return {"success": true, "result": {"state": status, "playing": playing, "paused": paused}}
+	# Sorun 32 fix: Godot 4.7 API'si: is_playing_scene() + get_playing_scene().
+	# paused bilgisi editor API'sinde artık yok → her zaman false dönülür.
+	var playing = _ei.is_playing_scene()
+	var scene_path = _ei.get_playing_scene() if playing else ""
+
+	var status = "playing" if playing else "stopped"
+	return {"success": true, "result": {"state": status, "playing": playing, "paused": false, "scene": scene_path}}
 
 func selection_get(params: Dictionary) -> Dictionary:
 	var selection = _ei.get_selection()
@@ -76,5 +78,8 @@ func set_project_setting(params: Dictionary) -> Dictionary:
 	return {"success": true, "result": {"message": "Proje ayarı güncellendi."}}
 
 func get_project_path(params: Dictionary) -> Dictionary:
-	var path = OS.get_executable_path().get_base_dir()
+	# NOT: Windows'ta ters eğik çizgili (C:\...) native yol döner (Sorun 26).
+	# JSON serialize sırasında otomatik escape edilir; C# tarafı Path.Combine /
+	# Directory.Exists ile sorunsuz kullanır. Godot tarzı '/' isterseniz
+	# .replace("\\", "/") uygulayın.
 	return {"success": true, "result": {"path": ProjectSettings.globalize_path("res://")}}
